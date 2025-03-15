@@ -28,7 +28,7 @@ from pyscf.lib import exceptions
 from scipy import sparse
 
 
-def normalize_primitive_weights(basis_list):
+def normalize_primitive_weights(basis_list, ndim: int = 2):
   """Correctly handle the primitive weighting and normalization.
 
   A general basis_list specification for a cGTO of the form
@@ -46,11 +46,11 @@ def normalize_primitive_weights(basis_list):
     a basis_list where all w_i's are correctly scaled to ensure that the cGTOs
     square integrate to 1.
   """
-  bas, env = pyscf.gto.mole.make_bas_env(basis_list)
+  bas, env = pyscf.gto.mole.make_bas_env(basis_list)                   # basis here, could be a problem
   bas = np.array(bas)
   angl = bas[:, 1]
   start_ptrs = bas[:, 5]
-  spec_shape = bas[:, 3:1:-1] + [[1, 0]]
+  spec_shape = bas[:, ndim:1:-1] + [[1, 0]]          # replaced 3 with ndim --- could be a problem
   stop_ptrs = start_ptrs + spec_shape[:, 0] * spec_shape[:, 1]
   basis_list = []
   for l, start, stop, shape in zip(angl, start_ptrs, stop_ptrs, spec_shape):
@@ -61,10 +61,10 @@ def normalize_primitive_weights(basis_list):
 def full_cart2sph(l: int, reorder_p: bool = False) -> np.ndarray:
   """Computes transform from a complete cartesian representation to spherical.
 
-  Given a complete set of 3**L cartesian derivatives of order L sorted
+  Given a complete set of ndim**L cartesian derivatives of order L sorted
   alphabetically according to
    > itertools.product('xyz', repeat=L)
-  This function returns a [3**L, 2L+1] matrix that converts the cartesian
+  This function returns a [ndim**L, 2L+1] matrix that converts the cartesian
   representation to 2L+1 components of a spherical harmonic representation.
   We choose to give equal weighting to symmetrically equivalent
   cartesian derivatives e.g. d2/dxdy == d2/dydx in this conversion.
@@ -74,11 +74,11 @@ def full_cart2sph(l: int, reorder_p: bool = False) -> np.ndarray:
     reorder_p: whether to reorder p orbitals into PySCF order.
 
   Returns:
-    a [3**L, 2L+1] matrix to convert from cartesian to spherical harmonic
+    a ndim**L, 2L+1] matrix to convert from cartesian to spherical harmonic
     representation.
   """
   # all cartesian combinations
-  complete_cart = list(itertools.product(range(3), repeat=l))
+  complete_cart = list(itertools.product(range(), repeat=l))
   # make a list containing symmetrically unique cartesian combinations
   unique_cart = [x for x in complete_cart if x == tuple(sorted(x))]
   # make an indicator tensor that maps from the complete combinations to the
@@ -335,7 +335,7 @@ class Mol:
       construction_spec[k] = np.array(v)
     return construction_spec
 
-  def eval_gto(self, coords: jnp.ndarray) -> jnp.ndarray:
+  def eval_gto(self, coords: jnp.ndarray, ndim: int = 2) -> jnp.ndarray:   # switching to 2D
     r"""Computes all gtos on the grid of coords.
 
     A primitive GTO consists of the product of a gaussian radial part and a
@@ -350,7 +350,7 @@ class Mol:
     angular parts as dictated by the lists in self._spec.
 
     Args:
-      coords: a [G, 3] array containing the xyz coords at which to evaluate the
+      coords: a [G, ndim] array containing the xyz coords at which to evaluate the
         GTOs
 
     Returns:
@@ -364,9 +364,9 @@ class Mol:
     #   CGTO = mol.nao_nr() (number of contrated GTOs)
     #   CSHELL = mol.nbas = number of contracted shells
 
-    # construct copies of the grid centred on each atom [G, A, 3]
+    # construct copies of the grid centred on each atom [G, A, ndim]
     dr = coords[:, None, :] - self._spec['atom_centres']
-    flat_dr = dr.reshape(-1, 3)
+    flat_dr = dr.reshape(-1, ndim)
     # construct all solid harmonics [2L+1, L, (G*A)]
     max_l = self._get_max_l()
     sh = solid_harmonic(flat_dr, max_l)

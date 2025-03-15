@@ -24,6 +24,7 @@ from ferminet import network_blocks
 import jax
 import jax.numpy as jnp
 from typing_extensions import Protocol
+import sys
 
 
 FermiLayers = Tuple[Tuple[int, int], ...]
@@ -449,7 +450,7 @@ def _combine_spin_pairs(
 def construct_input_features(
     pos: jnp.ndarray,
     atoms: jnp.ndarray,
-    ndim: int = 3) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    ndim: int = 2) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
   """Constructs inputs to Fermi Net from raw electron and atomic positions.
 
   Args:
@@ -478,7 +479,10 @@ def construct_input_features(
   return ae, ee, r_ae, r_ee[..., None]
 
 
-def make_ferminet_features(
+
+
+
+def make_ferminet_features(        # FERMINET FEATURES
     natoms: int,
     nspins: Optional[Tuple[int, int]] = None,
     ndim: int = 3,
@@ -1060,7 +1064,7 @@ def make_fermi_net_layers(
 ## Network layers: orbitals ##
 
 
-def make_orbitals(
+def make_orbitals(                                    # Important: Here the main construction is done, takes feature layers, other layers, evelopes (in options)
     nspins: Tuple[int, int],
     charges: jnp.ndarray,
     options: BaseNetworkOptions,
@@ -1108,7 +1112,7 @@ def make_orbitals(
         # electron per determinant.
         norbitals = nspin * options.determinants * num_states
       if options.complex_output:
-        norbitals *= 2  # one output is real, one is imaginary
+        norbitals *= 2  # one output is real, one is imaginary       # For complex output, we need two orbitals per real orbital.
       nspin_orbitals.append(norbitals)
 
     # create envelope params
@@ -1155,7 +1159,7 @@ def make_orbitals(
       atoms: jnp.ndarray,
       charges: jnp.ndarray,
   ) -> Sequence[jnp.ndarray]:
-    """Forward evaluation of the Fermionic Neural Network up to the orbitals.
+    """Forward evaluation of the Fermionic Neural Network up to the orbitals.               # up to the orbitals!
 
     Args:
       params: network parameter tree.
@@ -1169,7 +1173,7 @@ def make_orbitals(
       columns under the exchange of inputs of shape (ndet, nalpha+nbeta,
       nalpha+nbeta) (or (ndet, nalpha, nalpha) and (ndet, nbeta, nbeta)).
     """
-    ae, ee, r_ae, r_ee = construct_input_features(pos, atoms, ndim=options.ndim)
+    ae, ee, r_ae, r_ee = construct_input_features(pos, atoms, ndim=options.ndim)    # input features -- constructing ae, ee, r_ae, r_ee before the feature layer
     h_to_orbitals = equivariant_layers_apply(
         params['layers'],
         ae=ae,
@@ -1232,7 +1236,7 @@ def make_orbitals(
       orbitals = [jnp.concatenate(orbitals, axis=1)]
 
     # Optionally apply Jastrow factor for electron cusp conditions.
-    # Added pre-determinant for compatibility with pretraining.
+    # Added pre-determinant for compatibility with pretraining.            # exp in jastrow is added here
     if jastrow_apply is not None:
       jastrow = jnp.exp(
           jastrow_apply(r_ee, params['jastrow'], nspins) / sum(nspins)
@@ -1472,7 +1476,7 @@ def make_fermi_net(
 
   equivariant_layers = make_fermi_net_layers(nspins, charges.shape[0], options)
 
-  orbitals_init, orbitals_apply = make_orbitals(
+  orbitals_init, orbitals_apply = make_orbitals(  # here the neural net is assembled from feature_layer, equivariant_layers, envelopes (in options), etc.
       nspins=nspins,
       charges=charges,
       options=options,

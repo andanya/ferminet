@@ -207,7 +207,7 @@ class Scf:
     """Evaluates the Hartree-Fock single-particle orbitals at a set of points.
 
     Args:
-      positions: numpy array of shape (N, 3) of the positions in space at which
+      positions: numpy array of shape (N, ndim) of the positions in space at which
         to evaluate the Hartree-Fock orbitals.
 
     Returns:
@@ -246,12 +246,13 @@ class Scf:
 
   def eval_orbitals(self,
                     pos: NDArray,
-                    nspins: Tuple[int, int]) -> Tuple[NDArray, NDArray]:
+                    nspins: Tuple[int, int],
+                    ndim: int = 2) -> Tuple[NDArray, NDArray]:   # swiching to 2D
     """Evaluates SCF orbitals at a set of positions.
 
     Args:
       pos: an array of electron positions to evaluate the orbitals at, of shape
-        (..., nelec*3), where the leading dimensions are arbitrary, nelec is the
+        (..., nelec*ndim), where the leading dimensions are arbitrary, nelec is the
         number of electrons and the spin up electrons are ordered before the
         spin down electrons.
       nspins: tuple with number of spin up and spin down electrons.
@@ -267,7 +268,7 @@ class Scf:
         raise ValueError('Input must be either NumPy or JAX array.') from exc
     leading_dims = pos.shape[:-1]
     # split into separate electrons
-    pos = jnp.reshape(pos, [-1, 3])  # (batch*nelec, 3)
+    pos = jnp.reshape(pos, [-1, ndim])  # (batch*nelec, ndim)
     mos = self.eval_mos(pos)  # (batch*nelec, nbasis), (batch*nelec, nbasis)
     # Reshape into (batch, nelec, nbasis) for each spin channel.
     mos = [jnp.reshape(mo, leading_dims + (sum(nspins), -1)) for mo in mos]

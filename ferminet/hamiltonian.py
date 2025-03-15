@@ -272,7 +272,7 @@ def potential_electron_electron(r_ee: Array) -> jnp.ndarray:
       required.
   """
   r_ee = r_ee[jnp.triu_indices_from(r_ee[..., 0], 1)]
-  return (1.0 / r_ee).sum()
+  return (1.0 / r_ee / 5.).sum()                            # e-e with eps = 5
 
 
 def potential_electron_nuclear(charges: Array, r_ae: Array) -> jnp.ndarray:
@@ -283,7 +283,12 @@ def potential_electron_nuclear(charges: Array, r_ae: Array) -> jnp.ndarray:
     r_ae: Shape (nelectrons, natoms). r_ae[i, j] gives the distance between
       electron i and atom j.
   """
-  return -jnp.sum(charges / r_ae[..., 0])
+  DISK_RADIUS = 10.
+  RIM_WIDTH = 0.1
+  BARRIER_HEIGHT = 10.
+  # return 0. * (-jnp.sum(charges / r_ae[..., 0]))             # turning off e-a for now
+  # returning a disk potential instead
+  return jnp.sum(BARRIER_HEIGHT * (1. + jnp.tanh((r_ae[..., 0, 0] - DISK_RADIUS) / RIM_WIDTH)) / 2.)
 
 
 def potential_nuclear_nuclear(charges: Array, atoms: Array) -> jnp.ndarray:
@@ -294,8 +299,8 @@ def potential_nuclear_nuclear(charges: Array, atoms: Array) -> jnp.ndarray:
     atoms: Shape (natoms, ndim). Positions of the atoms.
   """
   r_aa = jnp.linalg.norm(atoms[None, ...] - atoms[:, None], axis=-1)
-  return jnp.sum(
-      jnp.triu((charges[None, ...] * charges[..., None]) / r_aa, k=1))
+  return 0. * jnp.sum(
+      jnp.triu((charges[None, ...] * charges[..., None]) / r_aa, k=1))    # turning off a-a for now
 
 
 def potential_energy(r_ae: Array, r_ee: Array, atoms: Array,
@@ -404,14 +409,14 @@ def local_energy(
             atoms=data.atoms,
             charges=data.charges,
         )
-        pot_spectrum += jax.vmap(pp_local, (0,))(r_ae)[:, None]
+        pot_spectrum += jax.vmap(pp_local, (0,))(r_ae)[:, None]    # pseudopotential part, can do without it
         vmap_pp_nonloc = jax.vmap(
             pp_nonlocal, (None, None, None, data_vmap_dims, 0, 0))
         pot_spectrum += vmap_pp_nonloc(key, f, params, data_, ae, r_ae)
 
       # Combine terms
       if state_specific:
-        # For simplicity, we will only implement a folx version of the kinetic
+        # For simplicity, we will only implement a folx version of the kinetic    # folx for kinetic energy (laplacian)!
         # energy calculation here.
         # TODO(pfau): factor out code repeated here and in _lapl_over_f
         pos_ = jnp.reshape(data.positions, [states, -1])

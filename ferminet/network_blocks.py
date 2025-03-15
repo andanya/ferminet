@@ -168,7 +168,7 @@ def logdet_matmul(
     result = jnp.sum(det)
   else:
     result = jnp.matmul(det, w)[0]
-  # return phase as a unit-norm complex number, rather than as an angle
+  # return phase as a unit-norm complex number, rather than as an angle   --- this is not what is done below
   if result.dtype == jnp.complex64 or result.dtype == jnp.complex128:
     phase_out = jnp.angle(result)  # result / jnp.abs(result)
   else:
